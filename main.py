@@ -2,7 +2,7 @@ import os
 import time
 import subprocess
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def cleaner(name: str) -> str:
     """
@@ -54,14 +54,23 @@ def wait_until(target_hour, target_minute):
         time.sleep(1)
 
 def should_stop_execution():
-    """Check if current time is 08:00 or later, indicating we should stop."""
-    now = datetime.now().time()
-    # Stop if time is between 08:00 and 19:52 (before next start time)
-    if now.hour >= 8 and now.hour < 19:
-        return True
-    elif now.hour == 19 and now.minute < 52:
-        return True
-    return False
+    """
+    Stop execution once we hit the *next* 08:00.
+    If it's already past 08:00 today when the script starts,
+    the cutoff is set for tomorrow at 08:00.
+    """
+    # Store static cutoff time the first time this function runs
+    if not hasattr(should_stop_execution, "cutoff"):
+        now = datetime.now()
+        cutoff = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        if now >= cutoff:  
+            # Already past 08:00 today → set cutoff to tomorrow 08:00
+            cutoff += timedelta(days=1)
+        should_stop_execution.cutoff = cutoff
+        print(f"⏳ Cutoff time set to: {cutoff.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # Compare against the stored cutoff
+    return datetime.now() >= should_stop_execution.cutoff
 
 def traverse_and_list_videos_in_film_folders(base_path, log_file_path):
     """Recursively traverse folders and log video files only from '1. Film' folders."""
@@ -253,7 +262,7 @@ if __name__ == "__main__":
             exit(1)
     
     # Step 3: Wait until target time
-    wait_until(21, 26)
+    wait_until(18, 33)
     
     # Step 4: Create log file path in E: root (initialize with header)
     log_file_path = "E:/logs.txt"
