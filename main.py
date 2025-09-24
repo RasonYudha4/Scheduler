@@ -25,6 +25,24 @@ def cleaner(name: str) -> str:
 
     return cleaned
 
+def clean_filename(filename: str) -> str:
+    """
+    Clean filename by:
+      1. Replacing spaces with underscores
+      2. Keeping only up to 'EPS_<number>'
+    """
+    # Replace spaces with underscores
+    name, ext = os.path.splitext(filename)
+    name = name.replace(" ", "_")
+
+    # Keep only up to 'EPS_<number>'
+    match = re.search(r'(.*?EPS[_\s]*\d+)', name, flags=re.IGNORECASE)
+    if match:
+        name = match.group(1)
+
+    return f"{name}{ext}"
+
+
 def wait_until(target_hour, target_minute):
     """Pause execution until system time matches target hour:minute."""
     print(f"⏳ Waiting until {target_hour:02d}:{target_minute:02d} ...")
@@ -156,7 +174,7 @@ def traverse_and_list_all_videos_in_series(base_path, log_file_path):
                     
                 if not file.startswith("._") and file.lower().endswith((".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".webm")):
                     # Replace spaces with underscores for the log entry
-                    file_with_underscores = cleaner(file)
+                    file_with_underscores = clean_filename(file)
                     log_entry = f"success {folder_with_underscores}/{file_with_underscores}\n"
                     log_file.write(log_entry)
                     log_file.flush()  # Ensure immediate write to file
