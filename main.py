@@ -1,7 +1,29 @@
 import os
 import time
 import subprocess
+import re
 from datetime import datetime
+
+def cleaner(name: str) -> str:
+    """
+    Clean folder name by:
+      1. Removing leading number-dot-space pattern (e.g., '1. Folder' -> 'Folder')
+      2. Removing everything starting from 'Eps' (case-insensitive)
+      3. Replacing spaces with underscores
+    """
+    # Remove leading number-dot-space
+    cleaned = re.sub(r'^\d+\.\s*', '', name)
+
+    # Remove everything from 'Eps' onwards (case-insensitive)
+    cleaned = re.sub(r'\s*Eps.*$', '', cleaned, flags=re.IGNORECASE)
+
+    # Convert to Title Case (each word capitalized)
+    cleaned = cleaned.title()
+
+    # Replace spaces with underscores
+    cleaned = cleaned.replace(" ", "_")
+
+    return cleaned
 
 def wait_until(target_hour, target_minute):
     """Pause execution until system time matches target hour:minute."""
@@ -42,6 +64,11 @@ def traverse_and_list_videos_in_film_folders(base_path, log_file_path):
             # Check if current folder is named "1. Film"
             folder_name = os.path.basename(root)
             if folder_name == "1. Film":
+                # Get the parent folder name (the folder containing "1. Film")
+                parent_folder_path = os.path.dirname(root)
+                raw_parent_folder_name = os.path.basename(parent_folder_path)
+                parent_folder_name = cleaner(raw_parent_folder_name)
+                
                 for file in files:
                     # Check stop time before each file processing
                     if should_stop_execution():
@@ -50,12 +77,16 @@ def traverse_and_list_videos_in_film_folders(base_path, log_file_path):
                         return video_count
                         
                     if not file.startswith("._") and file.lower().endswith((".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".webm")):
-                        # Replace spaces with underscores for the log entry
-                        file_with_underscores = file.replace(" ", "_")
+                        # Get file extension
+                        file_name, file_extension = os.path.splitext(file)
+                        
+                        # Use parent folder name with underscores instead of original filename
+                        file_with_underscores = parent_folder_name + file_extension
+                        
                         log_entry = f"success {file_with_underscores}\n"
                         log_file.write(log_entry)
                         log_file.flush()  # Ensure immediate write to file
-                        print(f"✅ Logged (Movies): {file}")
+                        print(f"✅ Logged (Movies): {file} -> {file_with_underscores}")
                         
                         # Execute AWS S3 upload command
                         original_file_path = os.path.join(root, file)
@@ -66,7 +97,7 @@ def traverse_and_list_videos_in_film_folders(base_path, log_file_path):
                         ]
                         
                         try:
-                            print(f"🚀 Uploading to S3: {file}")
+                            print(f"🚀 Uploading to S3: {file} as {file_with_underscores}")
                             result = subprocess.run(s3_command, capture_output=True, text=True, shell=False)
                             if result.returncode == 0:
                                 print(f"✅ S3 Upload successful: {file_with_underscores}")
@@ -114,7 +145,7 @@ def traverse_and_list_all_videos_in_series(base_path, log_file_path):
                 
             # Get current folder name and replace spaces with underscores
             folder_name = os.path.basename(root)
-            folder_with_underscores = folder_name.replace(" ", "_")
+            folder_with_underscores = cleaner(folder_name)
             
             for file in files:
                 # Check stop time before each file processing
@@ -125,7 +156,7 @@ def traverse_and_list_all_videos_in_series(base_path, log_file_path):
                     
                 if not file.startswith("._") and file.lower().endswith((".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".webm")):
                     # Replace spaces with underscores for the log entry
-                    file_with_underscores = file.replace(" ", "_")
+                    file_with_underscores = cleaner(file)
                     log_entry = f"success {folder_with_underscores}/{file_with_underscores}\n"
                     log_file.write(log_entry)
                     log_file.flush()  # Ensure immediate write to file
@@ -204,7 +235,7 @@ if __name__ == "__main__":
             exit(1)
     
     # Step 3: Wait until target time
-    wait_until(20, 57)
+    wait_until(21, 26)
     
     # Step 4: Create log file path in E: root (initialize with header)
     log_file_path = "E:/logs.txt"
